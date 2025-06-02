@@ -23,5 +23,5 @@ A Wi-Fi-enabled IoT device and backend for real-time monitoring and logging of A
 
 ---
 
-# Feel free to fork the repo and submit pull requests. 
-# This project is open source under the MIT License.
+## Feel free to fork the repo and submit pull requests. 
+## This project is open source under the MIT License.
