@@ -1,16 +1,52 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <PZEM004Tv30.h>
+#include <Wire.h>
+
+PZEM004Tv30 pzem(8, 9); // Software Serial pin 8 (RX) & 9 (TX)
+
+#define DEVICE_NAME "device A"
 
 // URLs
 const char* logURLBase = "http://mml-dev.ir/?log=";
 const char* postURL = "http://10.10.10.10:8090/login.xml";
 
-// POST parameters
+// POST parameters for intenet login
 const char* referer = "http://10.10.10.10:8090/httpclient.html";
 const int mode = 191;
 const char* username = "0110344685";
 const char* userPassword = "Mmlmml123";
 const int producttype = 0;
+
+// Backend API URL to log data
+const char* LogpostURL = "http://127.0.0.1:3000/backend/data.php";
+
+String collectSensorData(String deviceName) {
+    float voltage = pzem.voltage();
+    float current = pzem.current();
+    float power = pzem.power();
+    float energy = pzem.energy();
+    float frequency = pzem.frequency();
+    float pf = pzem.pf();
+
+    // Logging data with device name
+    Serial.printf("[%s] Voltage: %.2f V, Current: %.2f A, Power: %.2f W\n", deviceName.c_str(), voltage, current, power);
+    Serial.printf("[%s] Energy: %.2f kWh, Frequency: %.2f Hz, Power Factor: %.2f\n", deviceName.c_str(), energy, frequency, pf);
+    
+    // Creating JSON payload
+    String jsonData = "{";
+    jsonData += "\"name\":\"" + deviceName + "\",";
+    jsonData += "\"voltage\":" + String(voltage, 2) + ",";
+    jsonData += "\"current\":" + String(current, 2) + ",";
+    jsonData += "\"power\":" + String(power, 2) + ",";
+    jsonData += "\"energy\":" + String(energy, 2) + ",";
+    jsonData += "\"frequency\":" + String(frequency, 2) + ",";
+    jsonData += "\"power_factor\":" + String(pf, 2);
+    jsonData += "}";
+
+    return jsonData;
+}
+
 
 String performGetRequest() {
   WiFiClient client;
@@ -222,7 +258,7 @@ void setup() {
 void loop() {
   static unsigned long lastLogTime = 0;
 
-  if (millis() - lastLogTime >= 5000) {
+  if (millis() - lastLogTime >= 10000) {
     lastLogTime = millis();
 
     // Check Wi-Fi connection
@@ -242,13 +278,63 @@ void loop() {
 
 
   }
+  
+  // String jsonData = collectSensorData("DEVICE_A");
+  // sendData(jsonData);
+  
+  String deviceNames[] = {"Device A", "Device B", "Device C"};
+
+  for (int i = 0; i < 3; i++) {
+      String jsonData = generateData(deviceNames[i]);
+      sendData(jsonData);
+      delay(3000); // Small delay between requests
+  }
+
+  delay(1000); // Wait 10s before logging new data
 }
 
 
 
+// Function to generate random sensor data
+String generateData(const String& name) {
+    float voltage = 220.5 * (1 + (random(-10, 10) / 100.0));   // ±10% variation
+    float current = 1.25 * (1 + (random(-2, 2) / 100.0));      // ±2% variation
+    float power = 275.6 * (1 + (random(-5, 5) / 100.0));       // ±5% variation
+    float energy = 3.5 * (1 + (random(-3, 3) / 100.0));        // ±3% variation
+    float frequency = 50.0 * (1 + (random(-1, 1) / 100.0));    // ±1% variation
+    float powerFactor = 0.95 * (1 + (random(-5, 5) / 1000.0)); // ±0.5% variation
 
+    String data = "{";
+    data += "\"name\":\"" + name + "\",";
+    data += "\"voltage\":" + String(voltage, 3) + ",";
+    data += "\"current\":" + String(current, 3) + ",";
+    data += "\"power\":" + String(power, 3) + ",";
+    data += "\"energy\":" + String(energy, 3) + ",";
+    data += "\"frequency\":" + String(frequency, 3) + ",";
+    data += "\"power_factor\":" + String(powerFactor, 3);
+    data += "}";
 
+    return data;
+}
 
+// Function to send data to the backend
+void sendData(String jsonData) {
+    WiFiClient client;
+    HTTPClient http;
+    
+    Serial.println("Sending data: " + jsonData);
+    
+    http.begin(client, LogpostURL);
+    http.addHeader("Content-Type", "application/json");
 
+    int httpResponseCode = http.POST(jsonData);
 
+    if (httpResponseCode > 0) {
+        Serial.print("Server Response: ");
+        Serial.println(http.getString());
+    } else {
+        Serial.printf("Error in POST request. HTTP Response code: %d\n", httpResponseCode);
+    }
 
+    http.end();
+}
