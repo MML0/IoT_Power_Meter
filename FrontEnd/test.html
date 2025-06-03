@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Device Multi-Metric Graphs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 20px;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 30px auto;
+            padding: 20px;
+            max-width: 900px;
+        }
+        .chart-title {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        #metric-selector, #limit-selector {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #metric-selector label {
+            margin: 0 10px;
+        }
+        body.dark {
+            background: #121212;
+            color: #eee;
+        }
+        body.dark .chart-container {
+            background: #1e1e1e;
+            color: #eee;
+        }
+        body.dark canvas {
+            background-color: #1e1e1e;
+        }
+        #dark-toggle {
+            position: fixed;
+            top: 15px;
+            right: 20px;
+            background: #333;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 999;
+        }
+
+    </style>
+</head>
+<body>
+<button id="dark-toggle" onclick="toggleDarkMode()">🌙 Toggle Dark Mode</button>
+
+<div id="limit-selector">
+    <label for="limit-input"><strong>Data Limit:</strong></label>
+    <input type="number" id="limit-input" value="25" min="1" style="width: 60px;">
+    <button onclick="loadData()">Load</button>
+</div>
+
+<div id="metric-selector">
+    <strong>Select Metrics:</strong><br>
+</div>
+
+<div id="charts"></div>
+
+<script>
+const metricColors = {
+    voltage: 'rgba(255, 99, 132, 1)',
+    current: 'rgba(54, 162, 235, 1)',
+    power: 'rgba(255, 206, 86, 1)',
+    energy: 'rgba(75, 192, 192, 1)',
+    frequency: 'rgba(153, 102, 255, 1)',
+    power_factor: 'rgba(255, 159, 64, 1)'
+};
+
+let allCharts = [];
+
+function createMetricCheckboxes() {
+    const selector = document.getElementById('metric-selector');
+    selector.innerHTML = '<strong>Select Metrics:</strong><br>'; // Clear before re-adding
+    Object.keys(metricColors).forEach(metric => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `cb-${metric}`;
+        checkbox.value = metric;
+        checkbox.checked = true;
+        checkbox.addEventListener('change', updateAllCharts);
+
+        const label = document.createElement('label');
+        label.htmlFor = checkbox.id;
+        label.textContent = metric.replace('_', ' ').toUpperCase();
+
+        selector.appendChild(checkbox);
+        selector.appendChild(label);
+    });
+}
+
+function getSelectedMetrics() {
+    return Object.keys(metricColors).filter(metric => {
+        return document.getElementById(`cb-${metric}`)?.checked;
+    });
+}
+
+function updateAllCharts() {
+    const selected = getSelectedMetrics();
+    allCharts.forEach(chartInfo => {
+        const { chart, data, labels } = chartInfo;
+
+        chart.data.labels = labels;
+        chart.data.datasets = selected.map(metric => ({
+            label: metric.replace('_', ' ').toUpperCase(),
+            data: data.map(e => e[metric]),
+            borderColor: metricColors[metric],
+            backgroundColor: 'rgba(0,0,0,0)',
+            tension: 0.3,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            yAxisID: 'y'
+        }));
+
+        chart.update();
+    });
+}
+
+function loadData() {
+    const limit = document.getElementById('limit-input').value || 25;
+    const url = `http://127.0.0.1:3000/backend/data.php?limit=${limit}`;
+
+    fetch(url)
+        .then(res => res.json())
+        .then(res => {
+            const data = res.data;
+            document.getElementById('charts').innerHTML = '';
+            allCharts = [];
+            createMetricCheckboxes();
+
+            const grouped = {};
+            data.forEach(entry => {
+                if (!grouped[entry.name]) grouped[entry.name] = [];
+                grouped[entry.name].push(entry);
+            });
+
+            const chartsDiv = document.getElementById('charts');
+
+            Object.keys(grouped).forEach(deviceName => {
+                const entries = grouped[deviceName].sort((a, b) =>
+                    new Date(a.created_at) - new Date(b.created_at)
+                );
+
+                const labels = entries.map(e => e.created_at);
+                const selectedMetrics = getSelectedMetrics();
+
+                const datasets = selectedMetrics.map(metric => ({
+                    label: metric.replace('_', ' ').toUpperCase(),
+                    data: entries.map(e => e[metric]),
+                    borderColor: metricColors[metric],
+                    backgroundColor: 'rgba(0,0,0,0)',
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    yAxisID: 'y'
+                }));
+
+                const canvasId = `chart-${deviceName.replace(/\s+/g, '-')}`;
+
+                const container = document.createElement('div');
+                container.className = 'chart-container';
+                container.innerHTML = `
+                    <div class="chart-title">${deviceName} - Selected Metrics</div>
+                    <canvas id="${canvasId}" height="350"></canvas>
+                `;
+                chartsDiv.appendChild(container);
+
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                const chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Value'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Timestamp'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                allCharts.push({ chart, data: entries, labels });
+            });
+        });
+}
+function toggleDarkMode() {
+    const isDark = document.body.classList.toggle('dark');
+
+    allCharts.forEach(({ chart }) => {
+        chart.options.plugins.legend.labels.color = isDark ? '#ccc' : '#000';
+        chart.options.scales.x.ticks.color = isDark ? '#ccc' : '#000';
+        chart.options.scales.y.ticks.color = isDark ? '#ccc' : '#000';
+        chart.options.scales.x.title.color = isDark ? '#ccc' : '#000';
+        chart.options.scales.y.title.color = isDark ? '#ccc' : '#000';
+        chart.update();
+    });
+}
+
+// Initial load
+loadData();
+</script>
+
+</body>
+</html>
