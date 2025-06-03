@@ -3,6 +3,7 @@ import random
 
 # Replace this URL with the actual location of your PHP script
 url = "http://127.0.0.1:3000/backend/data.php"
+url = "http://mml-dev.ir/powermeter/data.php"
 
 # Function to generate randomized data
 def generate_data(name = "Device A"):

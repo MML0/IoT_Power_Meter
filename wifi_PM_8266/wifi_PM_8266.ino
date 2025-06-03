@@ -19,7 +19,7 @@ const char* userPassword = "Mmlmml123";
 const int producttype = 0;
 
 // Backend API URL to log data
-const char* LogpostURL = "http://127.0.0.1:3000/backend/data.php";
+const char* LogpostURL = "http://mml-dev.ir/powermeter/data.php";
 
 String collectSensorData(String deviceName) {
     float voltage = pzem.voltage();
@@ -202,7 +202,7 @@ bool loginToInternet(int maxRetries = 3, int delayBetweenRetries = 3000) {
     delay(1000);
     ESP.restart();
   }
-  // return success==true ; // XD
+  return success==true ; // XD
 }
 bool logEvent(String message) {
   Serial.println("Log: " + message);
@@ -236,6 +236,7 @@ void setup() {
   delay(1000);
 
   while (true) {
+    Serial.println(".");
     Serial.println("Scanning for WiFi networks...");
     int numNetworks = WiFi.scanNetworks();
 
@@ -286,15 +287,23 @@ void setup() {
   // Perform POST
   // performPostRequest();
   logEvent("not loged in");
+  delay(100);
 
   loginToInternet(4, 1000);  // Try 5 times, wait 4 seconds between tries
 
-  logEvent("test 1 esp 8266");
-  delay(4000);
-  logEvent("test 2 esp 8266");
+  // logEvent("test 1 esp 8266");
+  // delay(4000);
+  // logEvent("loged in");
+  // Log signal strength
+  
+  String currentSSID = WiFi.SSID();
+  int rssi = WiFi.RSSI();
+  // Serial.printf("📶 Connected to: %s | RSSI: %d dBm\n", currentSSID.c_str(), rssi);
+  String msg = "📶 Connected to: " + currentSSID + " | RSSI: " + String(rssi) + " dBm";
+  logEvent(msg);
 
   // Perform GET
-  performGetRequest();
+  // performGetRequest();
 }
 
 void loop() {
@@ -311,10 +320,10 @@ void loop() {
       ESP.restart();
     }
 
-    // Log signal strength
+    // // Log signal strength
     String currentSSID = WiFi.SSID();
     int rssi = WiFi.RSSI();
-    // Serial.printf("📶 Connected to: %s | RSSI: %d dBm\n", currentSSID.c_str(), rssi);
+    // // Serial.printf("📶 Connected to: %s | RSSI: %d dBm\n", currentSSID.c_str(), rssi);
     String msg = "📶 Connected to: " + currentSSID + " | RSSI: " + String(rssi) + " dBm";
     logEvent(msg);
 
@@ -330,6 +339,6 @@ void loop() {
         delay(3000); // Small delay between requests
     }
 
-    // delay(1000); // Wait 10s before logging new data
+    delay(10000); // Wait 10s before logging new data
   }
 }
