@@ -46,7 +46,49 @@ String collectSensorData(String deviceName) {
 
     return jsonData;
 }
+// Function to generate random sensor data
+String generateData(const String& name) {
+    float voltage = 220.5 * (1 + (random(-10, 10) / 100.0));   // ±10% variation
+    float current = 1.25 * (1 + (random(-2, 2) / 100.0));      // ±2% variation
+    float power = 275.6 * (1 + (random(-5, 5) / 100.0));       // ±5% variation
+    float energy = 3.5 * (1 + (random(-3, 3) / 100.0));        // ±3% variation
+    float frequency = 50.0 * (1 + (random(-1, 1) / 100.0));    // ±1% variation
+    float powerFactor = 0.95 * (1 + (random(-5, 5) / 1000.0)); // ±0.5% variation
 
+    String data = "{";
+    data += "\"name\":\"" + name + "\",";
+    data += "\"voltage\":" + String(voltage, 3) + ",";
+    data += "\"current\":" + String(current, 3) + ",";
+    data += "\"power\":" + String(power, 3) + ",";
+    data += "\"energy\":" + String(energy, 3) + ",";
+    data += "\"frequency\":" + String(frequency, 3) + ",";
+    data += "\"power_factor\":" + String(powerFactor, 3);
+    data += "}";
+
+    return data;
+}
+
+// Function to send data to the backend
+void sendData(String jsonData) {
+    WiFiClient client;
+    HTTPClient http;
+    
+    Serial.println("Sending data: " + jsonData);
+    
+    http.begin(client, LogpostURL);
+    http.addHeader("Content-Type", "application/json");
+
+    int httpResponseCode = http.POST(jsonData);
+
+    if (httpResponseCode > 0) {
+        Serial.print("Server Response: ");
+        Serial.println(http.getString());
+    } else {
+        Serial.printf("Error in POST request. HTTP Response code: %d\n", httpResponseCode);
+    }
+
+    http.end();
+}
 
 String performGetRequest() {
   WiFiClient client;
@@ -276,65 +318,18 @@ void loop() {
     String msg = "📶 Connected to: " + currentSSID + " | RSSI: " + String(rssi) + " dBm";
     logEvent(msg);
 
-
-  }
-  
-  // String jsonData = collectSensorData("DEVICE_A");
-  // sendData(jsonData);
-  
-  String deviceNames[] = {"Device A", "Device B", "Device C"};
-
-  for (int i = 0; i < 3; i++) {
-      String jsonData = generateData(deviceNames[i]);
-      sendData(jsonData);
-      delay(3000); // Small delay between requests
-  }
-
-  delay(1000); // Wait 10s before logging new data
-}
-
-
-
-// Function to generate random sensor data
-String generateData(const String& name) {
-    float voltage = 220.5 * (1 + (random(-10, 10) / 100.0));   // ±10% variation
-    float current = 1.25 * (1 + (random(-2, 2) / 100.0));      // ±2% variation
-    float power = 275.6 * (1 + (random(-5, 5) / 100.0));       // ±5% variation
-    float energy = 3.5 * (1 + (random(-3, 3) / 100.0));        // ±3% variation
-    float frequency = 50.0 * (1 + (random(-1, 1) / 100.0));    // ±1% variation
-    float powerFactor = 0.95 * (1 + (random(-5, 5) / 1000.0)); // ±0.5% variation
-
-    String data = "{";
-    data += "\"name\":\"" + name + "\",";
-    data += "\"voltage\":" + String(voltage, 3) + ",";
-    data += "\"current\":" + String(current, 3) + ",";
-    data += "\"power\":" + String(power, 3) + ",";
-    data += "\"energy\":" + String(energy, 3) + ",";
-    data += "\"frequency\":" + String(frequency, 3) + ",";
-    data += "\"power_factor\":" + String(powerFactor, 3);
-    data += "}";
-
-    return data;
-}
-
-// Function to send data to the backend
-void sendData(String jsonData) {
-    WiFiClient client;
-    HTTPClient http;
     
-    Serial.println("Sending data: " + jsonData);
+    // String jsonData = collectSensorData("DEVICE_A");
+    // sendData(jsonData);
     
-    http.begin(client, LogpostURL);
-    http.addHeader("Content-Type", "application/json");
+    String deviceNames[] = {"Device A", "Device B", "Device C"};
 
-    int httpResponseCode = http.POST(jsonData);
-
-    if (httpResponseCode > 0) {
-        Serial.print("Server Response: ");
-        Serial.println(http.getString());
-    } else {
-        Serial.printf("Error in POST request. HTTP Response code: %d\n", httpResponseCode);
+    for (int i = 0; i < 3; i++) {
+        String jsonData = generateData(deviceNames[i]);
+        sendData(jsonData);
+        delay(3000); // Small delay between requests
     }
 
-    http.end();
+    // delay(1000); // Wait 10s before logging new data
+  }
 }
